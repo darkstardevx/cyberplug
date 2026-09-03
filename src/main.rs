@@ -43,6 +43,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut app::App
                 Mode::AddUrl => handle_add_url(app, key.code)?,
                 Mode::ConfirmRemove => handle_confirm_remove(app, key.code)?,
                 Mode::Settings => handle_settings(app, key.code)?,
+                Mode::Placement => handle_placement(app, key.code)?,
             }
         }
 
@@ -63,12 +64,9 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
             app.input_buffer.clear();
         }
         KeyCode::Char('e') => {
-            if let Some(id) = app.selected_id() {
-                app.status = Some(match omarchy::enable(&id, None) {
-                    Ok(_) => format!("enabled {}", id),
-                    Err(e) => format!("error: {}", e),
-                });
-                app.refresh()?;
+            if app.selected_id().is_some() {
+                app.mode = Mode::Placement;
+                app.placement_selected = 1; // default to "center"
             }
         }
         KeyCode::Char('d') => {
@@ -93,6 +91,22 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
                     app.settings_editing = false;
                 }
             }
+        }
+        KeyCode::Char('u') => {
+            if let Some(id) = app.selected_id() {
+                app.status = Some(match omarchy::update(Some(&id)) {
+                    Ok(_) => format!("updated {}", id),
+                    Err(e) => format!("error: {}", e),
+                });
+                app.refresh()?;
+            }
+        }
+        KeyCode::Char('U') => {
+            app.status = Some(match omarchy::update(None) {
+                Ok(_) => "updated all plugins".to_string(),
+                Err(e) => format!("error: {}", e),
+            });
+            app.refresh()?;
         }
         _ => {}
     }
@@ -181,7 +195,26 @@ fn handle_settings(app: &mut app::App, code: KeyCode) -> Result<()> {
             KeyCode::Enter => {
                 if let Some(field) = entry.plugin.schema().get(app.settings_selected) {
                     let key = field.key.clone();
-                    let value = app.settings_edit_buffer.trim().to_string();
+                    let mut value = app.settings_edit_buffer.trim().to_string();
+
+                    if field.field_type == "integer" {
+                        if let Ok(mut n) = value.parse::<f64>() {
+                            if let Some(min) = field.min {
+                                n = n.max(min);
+                            }
+                            if let Some(max) = field.max {
+                                n = n.min(max);
+                            }
+                            if let Some(step) = field.step {
+                                if step > 0.0 {
+                                    let base = field.min.unwrap_or(0.0);
+                                    n = base + ((n - base) / step).round() * step;
+                                }
+                            }
+                            value = (n as i64).to_string();
+                        }
+                    }
+
                     app.local_settings.set(&plugin_id, &key, value.clone());
                     app.local_settings.save()?;
                     app.status = Some(format!("staged {}={} for {}", key, value, plugin_id));
@@ -230,6 +263,36 @@ fn handle_settings(app: &mut app::App, code: KeyCode) -> Result<()> {
                 app.settings_edit_buffer = current;
                 app.settings_editing = true;
             }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_placement(app: &mut app::App, code: KeyCode) -> Result<()> {
+    use app::PLACEMENTS;
+    match code {
+        KeyCode::Esc => app.mode = Mode::Normal,
+        KeyCode::Char('h') | KeyCode::Left | KeyCode::Char('k') | KeyCode::Up => {
+            app.placement_selected = if app.placement_selected == 0 {
+                PLACEMENTS.len() - 1
+            } else {
+                app.placement_selected - 1
+            };
+        }
+        KeyCode::Char('l') | KeyCode::Right | KeyCode::Char('j') | KeyCode::Down => {
+            app.placement_selected = (app.placement_selected + 1) % PLACEMENTS.len();
+        }
+        KeyCode::Enter => {
+            if let Some(id) = app.selected_id() {
+                let placement = PLACEMENTS[app.placement_selected];
+                app.status = Some(match omarchy::enable(&id, Some(placement)) {
+                    Ok(_) => format!("enabled {} at {}", id, placement),
+                    Err(e) => format!("error: {}", e),
+                });
+                app.refresh()?;
+            }
+            app.mode = Mode::Normal;
         }
         _ => {}
     }

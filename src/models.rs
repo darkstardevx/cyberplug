@@ -27,6 +27,7 @@ pub struct BarWidget {
     #[serde(default)]
     pub category: Option<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub defaults: Option<serde_json::Value>,
     #[serde(default)]
     pub schema: Vec<SchemaField>,

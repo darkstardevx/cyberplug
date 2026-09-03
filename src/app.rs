@@ -4,6 +4,8 @@ use crate::omarchy;
 use crate::settings;
 use anyhow::Result;
 
+pub const PLACEMENTS: [&str; 3] = ["left", "center", "right"];
+
 pub struct PluginEntry {
     pub plugin: Plugin,
     pub enabled: bool,
@@ -16,6 +18,7 @@ pub enum Mode {
     AddUrl,
     Settings,
     ConfirmRemove,
+    Placement,
 }
 
 pub struct App {
@@ -31,6 +34,7 @@ pub struct App {
     pub settings_editing: bool,
     pub settings_edit_buffer: String,
     pub local_settings: settings::LocalSettings,
+    pub placement_selected: usize,
 }
 
 impl App {
@@ -51,6 +55,7 @@ impl App {
             settings_editing: false,
             settings_edit_buffer: String::new(),
             local_settings,
+            placement_selected: 0,
         })
     }
 

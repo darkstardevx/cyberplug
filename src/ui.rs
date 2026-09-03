@@ -1,4 +1,4 @@
-use crate::app::{App, Mode};
+use crate::app::{App, Mode, PLACEMENTS};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -17,6 +17,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     match app.mode {
         Mode::Settings => draw_settings(frame, app, chunks[0]),
+        Mode::Placement => draw_placement(frame, app, chunks[0]),
         _ => draw_main(frame, app, chunks[0]),
     }
 
@@ -138,6 +139,9 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         if let Some(a) = &entry.plugin.author {
             lines.push(Line::from(format!("author: {}", a)));
         }
+        if !entry.plugin.kinds.is_empty() {
+            lines.push(Line::from(format!("kinds: {}", entry.plugin.kinds.join(", "))));
+        }
         let schema = entry.plugin.schema();
         if !schema.is_empty() {
             lines.push(Line::from(format!(
@@ -149,7 +153,7 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(entry.plugin.description.clone()));
         lines.push(Line::from(""));
         lines.push(Line::from(
-            "j/k nav   / filter   a add   e enable   d disable   x remove   s settings   q quit",
+            "j/k nav   / filter   a add   e enable   d disable   x remove   s settings   u update   U update-all   q quit",
         ));
         lines
     } else {
@@ -179,6 +183,43 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
+    let bar_widget = entry.plugin.bar_widget.as_ref();
+    let header_lines: Vec<Line> = {
+        let mut lines = vec![];
+        if let Some(bw) = bar_widget {
+            if let Some(name) = &bw.display_name {
+                lines.push(Line::from(Span::styled(
+                    name.clone(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )));
+            }
+            if let Some(cat) = &bw.category {
+                lines.push(Line::from(format!("category: {}", cat)));
+            }
+            if let Some(desc) = &bw.description {
+                lines.push(Line::from(desc.clone()));
+            }
+        }
+        lines
+    };
+    let header_height = header_lines.len() as u16 + if header_lines.is_empty() { 0 } else { 2 };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Length(schema.len() as u16 + 2),
+            Constraint::Min(3),
+        ])
+        .split(area);
+
+    if !header_lines.is_empty() {
+        frame.render_widget(
+            Paragraph::new(header_lines).wrap(Wrap { trim: true }),
+            chunks[0],
+        );
+    }
+
     let items: Vec<ListItem> = schema
         .iter()
         .enumerate()
@@ -197,9 +238,18 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 current
             };
+
+            let range_hint = match (field.min, field.max) {
+                (Some(min), Some(max)) => format!("  ({}-{})", min, max),
+                (Some(min), None) => format!("  (min {})", min),
+                (None, Some(max)) => format!("  (max {})", max),
+                _ => String::new(),
+            };
+
             let line = Line::from(vec![
                 Span::styled(format!("{:<28}", field.label), Style::default().fg(Color::White)),
                 Span::styled(value_display, Style::default().fg(Color::Green)),
+                Span::styled(range_hint, Style::default().fg(Color::DarkGray)),
             ]);
             ListItem::new(line)
         })
@@ -213,7 +263,61 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_stateful_widget(list, chunks[1], &mut state);
+
+    let description = schema
+        .get(app.settings_selected)
+        .and_then(|f| f.description.clone())
+        .or_else(|| {
+            schema
+                .get(app.settings_selected)
+                .map(|f| format!("type: {}", f.field_type))
+        })
+        .unwrap_or_default();
+
+    let desc_block = Block::default().borders(Borders::ALL).title(" info ");
+    frame.render_widget(
+        Paragraph::new(description).block(desc_block).wrap(Wrap { trim: true }),
+        chunks[2],
+    );
+}
+
+fn draw_placement(frame: &mut Frame, app: &App, area: Rect) {
+    let block = Block::default()
+        .title(" enable — choose placement (h/l or arrows, enter to confirm) ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let name = app
+        .selected_entry()
+        .map(|e| e.plugin.name.clone())
+        .unwrap_or_default();
+
+    let options: Vec<Span> = PLACEMENTS
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if i == app.placement_selected {
+                Span::styled(
+                    format!(" [{}] ", p),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::styled(format!("  {}   ", p), Style::default().fg(Color::White))
+            }
+        })
+        .collect();
+
+    let lines = vec![
+        Line::from(Span::styled(name, Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(options),
+    ];
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn draw_status_line(frame: &mut Frame, app: &App, area: Rect) {
