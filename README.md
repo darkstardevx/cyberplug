@@ -14,6 +14,9 @@ That builds the release binary and drops it in `~/.local/bin/cyberplug`.
 On Omarchy, `~/.local/bin` is already on your `$PATH` — nothing else to
 do. `install.sh` checks and tells you if it isn't.
 
+The installer also offers to add a bar icon that opens cyberplug in a
+floating terminal — see [Bar icon](#bar-icon) below.
+
 ## Use
 
     cyberplug
@@ -108,6 +111,30 @@ enable/disable state, and restores settings.
 
 This is the "don't rebuild your setup by hand" feature — reinstall
 Omarchy, run `cyberplug`, `P` → `i`, point at a saved profile, done.
+
+## Bar icon
+
+`install.sh` can add a "CP" icon to your Omarchy bar that opens cyberplug
+in a floating terminal, and focuses the existing window instead of
+opening a second one if you click it again.
+
+It auto-detects your terminal (Ghostty, Alacritty, Kitty, foot, or falls
+back to `xdg-terminal-exec`) and matches the window by title rather than
+class, since not every terminal reliably honors a custom window class
+from the command line.
+
+To install it separately from the main build:
+
+    cd cyberplug
+    ./install.sh
+    # answer "y" when asked about the bar icon
+
+To make the window float instead of tile, add this to
+`~/.config/hypr/looknfeel.lua`:
+
+    hl.window_rule({ match = { title = "Cyberplug" }, float = true, size = "650 550" })
+
+then `hyprctl reload`.
 
 ## Docs
 

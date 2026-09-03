@@ -177,16 +177,6 @@ impl App {
         self.apply_discovery_filter();
     }
 
-    pub fn discovery_category_label(&self) -> String {
-        if self.discovery_category_index == 0 {
-            "All".to_string()
-        } else {
-            self.discovery_categories
-                .get(self.discovery_category_index - 1)
-                .cloned()
-                .unwrap_or_else(|| "All".to_string())
-        }
-    }
 
     pub fn discovery_next(&mut self) {
         if !self.discovery_sources.is_empty() {

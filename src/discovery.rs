@@ -22,8 +22,6 @@ pub struct CatalogEntry {
     pub category: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
-    #[serde(default)]
-    pub kind: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -171,11 +169,6 @@ pub fn fetch(force_refresh: bool) -> Result<Vec<Source>> {
     }
 }
 
-/// Best-effort fetch of a repo's own GitHub description (the tagline on
-/// the repo page, not the plugin manifest) for entries the registry
-/// doesn't carry a description for. Returns None on any failure —
-/// network, rate limit, or a repo URL that doesn't parse — never errors
-/// the UI over a missing description.
 pub fn fetch_repo_description(repo_url: &str) -> Option<String> {
     let trimmed = repo_url.trim_end_matches('/');
     let parts: Vec<&str> = trimmed.rsplitn(3, '/').collect();

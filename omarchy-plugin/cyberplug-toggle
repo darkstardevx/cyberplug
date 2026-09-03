@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Focuses an existing floating cyberplug window, or opens a new one.
+#
+# Different terminals identify their windows differently to Hyprland:
+# some honor a real --class/--app-id flag (Alacritty, Kitty), others
+# (Ghostty, at time of writing) don't reliably take one from the CLI,
+# so we fall back to matching on window title instead, which every
+# terminal supports via -T/--title.
+
+CYBERPLUG_BIN="$HOME/.local/bin/cyberplug"
+WINDOW_TITLE="Cyberplug"
+
+focus_existing() {
+    hyprctl dispatch focuswindow "title:^(${WINDOW_TITLE})$" 2>/dev/null | grep -q ok
+}
+
+launch() {
+    local terminal="${TERMINAL:-}"
+    if [[ -z "$terminal" ]]; then
+        for candidate in ghostty alacritty kitty foot; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+                terminal="$candidate"
+                break
+            fi
+        done
+    fi
+
+    case "$terminal" in
+        alacritty)
+            exec setsid uwsm-app -- alacritty --class "$WINDOW_TITLE" --title "$WINDOW_TITLE" -e "$CYBERPLUG_BIN"
+            ;;
+        kitty)
+            exec setsid uwsm-app -- kitty --class "$WINDOW_TITLE" --title "$WINDOW_TITLE" "$CYBERPLUG_BIN"
+            ;;
+        ghostty)
+            exec setsid uwsm-app -- ghostty --title="$WINDOW_TITLE" -e "$CYBERPLUG_BIN"
+            ;;
+        foot)
+            exec setsid uwsm-app -- foot --title="$WINDOW_TITLE" "$CYBERPLUG_BIN"
+            ;;
+        *)
+            exec setsid uwsm-app -- xdg-terminal-exec --title="$WINDOW_TITLE" -e "$CYBERPLUG_BIN"
+            ;;
+    esac
+}
+
+if focus_existing; then
+    exit 0
+fi
+
+launch
