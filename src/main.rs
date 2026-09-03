@@ -13,9 +13,9 @@ use app::Mode;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 
@@ -36,7 +36,11 @@ fn main() -> Result<()> {
     let result = run(&mut terminal, &mut app);
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     result
@@ -97,13 +101,12 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
             }
         }
         KeyCode::Char('s') => {
-            if let Some(entry) = app.selected_entry() {
-                if !entry.plugin.schema().is_empty() {
+            if let Some(entry) = app.selected_entry()
+                && !entry.plugin.schema().is_empty() {
                     app.mode = Mode::Settings;
                     app.settings_selected = 0;
                     app.settings_editing = false;
                 }
-            }
         }
         KeyCode::Char('u') => {
             if let Some(id) = app.selected_id() {
@@ -219,23 +222,21 @@ fn handle_settings(app: &mut app::App, code: KeyCode) -> Result<()> {
                     let key = field.key.clone();
                     let mut value = app.settings_edit_buffer.trim().to_string();
 
-                    if field.field_type == "integer" {
-                        if let Ok(mut n) = value.parse::<f64>() {
+                    if field.field_type == "integer"
+                        && let Ok(mut n) = value.parse::<f64>() {
                             if let Some(min) = field.min {
                                 n = n.max(min);
                             }
                             if let Some(max) = field.max {
                                 n = n.min(max);
                             }
-                            if let Some(step) = field.step {
-                                if step > 0.0 {
+                            if let Some(step) = field.step
+                                && step > 0.0 {
                                     let base = field.min.unwrap_or(0.0);
                                     n = base + ((n - base) / step).round() * step;
                                 }
-                            }
                             value = (n as i64).to_string();
                         }
-                    }
 
                     app.local_settings.set(&plugin_id, &key, value.clone());
                     app.local_settings.save()?;
@@ -328,8 +329,7 @@ fn handle_discovery(app: &mut app::App, code: KeyCode) -> Result<()> {
         KeyCode::Char('k') | KeyCode::Up => app.discovery_previous(),
         KeyCode::Char('h') | KeyCode::Left => {
             let total = app.discovery_categories.len() + 1;
-            app.discovery_category_index =
-                (app.discovery_category_index + total - 1) % total;
+            app.discovery_category_index = (app.discovery_category_index + total - 1) % total;
             app.apply_discovery_filter();
         }
         KeyCode::Char('l') | KeyCode::Right => {
@@ -359,10 +359,8 @@ fn handle_discovery(app: &mut app::App, code: KeyCode) -> Result<()> {
                                 .unwrap_or(0);
                             app.mode = Mode::Placement;
                             app.placement_selected = 1;
-                            app.status = Some(format!(
-                                "{} installed — choose bar placement",
-                                source.name
-                            ));
+                            app.status =
+                                Some(format!("{} installed — choose bar placement", source.name));
                         } else {
                             app.status = Some(format!(
                                 "{} installed but not found as '{}' — check `omarchy plugin list` and enable manually",
@@ -411,10 +409,12 @@ fn handle_profile_path(app: &mut app::App, code: KeyCode) -> Result<()> {
                 if let Some(parent) = path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                app.status = Some(match profile::export(&app.plugins, &app.local_settings, &path) {
-                    Ok(_) => format!("exported profile to {}", path.display()),
-                    Err(e) => format!("error: {}", e),
-                });
+                app.status = Some(
+                    match profile::export(&app.plugins, &app.local_settings, &path) {
+                        Ok(_) => format!("exported profile to {}", path.display()),
+                        Err(e) => format!("error: {}", e),
+                    },
+                );
             } else {
                 let installed: Vec<String> =
                     app.plugins.iter().map(|e| e.plugin.id.clone()).collect();

@@ -1,10 +1,10 @@
 use crate::app::{App, Mode, PLACEMENTS};
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs, Wrap},
-    Frame,
 };
 
 fn category_color(category: &str) -> Color {
@@ -126,7 +126,11 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Cyan)),
         )
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::DarkGray),
+        )
         .highlight_symbol("> ");
 
     frame.render_stateful_widget(list, area, &mut state);
@@ -140,7 +144,11 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
 
     let text = if let Some(entry) = app.selected_entry() {
         let status = if entry.enabled { "enabled" } else { "disabled" };
-        let status_color = if entry.enabled { Color::Green } else { Color::DarkGray };
+        let status_color = if entry.enabled {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
         let category = entry
             .plugin
             .bar_widget
@@ -150,12 +158,17 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         let mut lines = vec![
             Line::from(Span::styled(
                 entry.plugin.name.clone(),
-                Style::default().add_modifier(Modifier::BOLD).fg(Color::White),
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::White),
             )),
             Line::from(""),
             Line::from(vec![
                 Span::raw("id: "),
-                Span::styled(entry.plugin.id.clone(), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    entry.plugin.id.clone(),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Line::from(vec![
                 Span::raw("status: "),
@@ -176,7 +189,10 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from(format!("author: {}", a)));
         }
         if !entry.plugin.kinds.is_empty() {
-            lines.push(Line::from(format!("kinds: {}", entry.plugin.kinds.join(", "))));
+            lines.push(Line::from(format!(
+                "kinds: {}",
+                entry.plugin.kinds.join(", ")
+            )));
         }
         let schema = entry.plugin.schema();
         if !schema.is_empty() {
@@ -197,7 +213,10 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         vec![Line::from("No plugins match.")]
     };
 
-    frame.render_widget(Paragraph::new(text).block(block).wrap(Wrap { trim: true }), area);
+    frame.render_widget(
+        Paragraph::new(text).block(block).wrap(Wrap { trim: true }),
+        area,
+    );
 }
 
 fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
@@ -265,7 +284,10 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, field)| {
-            let stored = app.local_settings.get(&entry.plugin.id, &field.key).cloned();
+            let stored = app
+                .local_settings
+                .get(&entry.plugin.id, &field.key)
+                .cloned();
             let is_staged = stored.is_some();
             let current = stored.unwrap_or_else(|| {
                 field
@@ -296,7 +318,10 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
             };
 
             let line = Line::from(vec![
-                Span::styled(format!("{:<28}", field.label), Style::default().fg(Color::White)),
+                Span::styled(
+                    format!("{:<28}", field.label),
+                    Style::default().fg(Color::White),
+                ),
                 Span::styled(value_display, Style::default().fg(value_color)),
                 Span::styled(range_hint, Style::default().fg(Color::DarkGray)),
             ]);
@@ -309,7 +334,11 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
 
     let list = List::new(items)
         .block(block)
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::DarkGray),
+        )
         .highlight_symbol("> ");
 
     frame.render_stateful_widget(list, chunks[1], &mut state);
@@ -326,7 +355,9 @@ fn draw_settings(frame: &mut Frame, app: &App, area: Rect) {
 
     let desc_block = Block::default().borders(Borders::ALL).title(" info ");
     frame.render_widget(
-        Paragraph::new(description).block(desc_block).wrap(Wrap { trim: true }),
+        Paragraph::new(description)
+            .block(desc_block)
+            .wrap(Wrap { trim: true }),
         chunks[2],
     );
 }
@@ -361,7 +392,10 @@ fn draw_placement(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let lines = vec![
-        Line::from(Span::styled(name, Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(
+            name,
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
         Line::from(""),
         Line::from(options),
     ];
@@ -372,7 +406,11 @@ fn draw_placement(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_discovery(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(3), Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(3),
+            Constraint::Length(1),
+        ])
         .split(area);
 
     draw_discovery_tabs(frame, app, chunks[0]);
@@ -438,7 +476,11 @@ fn draw_discovery_list(frame: &mut Frame, app: &App, area: Rect) {
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Magenta)),
         )
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::DarkGray),
+        )
         .highlight_symbol("> ");
 
     frame.render_stateful_widget(list, area, &mut state);
@@ -487,21 +529,24 @@ fn draw_discovery_detail(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "▶ press ENTER to install this plugin",
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
         )));
         lines
     } else {
         vec![Line::from("No plugins in this category.")]
     };
 
-    frame.render_widget(Paragraph::new(text).block(block).wrap(Wrap { trim: true }), area);
+    frame.render_widget(
+        Paragraph::new(text).block(block).wrap(Wrap { trim: true }),
+        area,
+    );
 }
 
 fn draw_discovery_hint(frame: &mut Frame, area: Rect) {
-    let hint = Paragraph::new(
-        "j/k nav  h/l category  ENTER install  r refresh  esc back",
-    )
-    .style(Style::default().fg(Color::DarkGray));
+    let hint = Paragraph::new("j/k nav  h/l category  ENTER install  r refresh  esc back")
+        .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hint, area);
 }
 
@@ -540,5 +585,8 @@ fn draw_profile_path(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_status_line(frame: &mut Frame, app: &App, area: Rect) {
     let text = app.status.clone().unwrap_or_default();
-    frame.render_widget(Paragraph::new(text).style(Style::default().fg(Color::Yellow)), area);
+    frame.render_widget(
+        Paragraph::new(text).style(Style::default().fg(Color::Yellow)),
+        area,
+    );
 }

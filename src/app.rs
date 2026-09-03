@@ -130,8 +130,7 @@ impl App {
     }
 
     pub fn load_discovery(&mut self, force_refresh: bool) -> Result<()> {
-        let installed: HashSet<&str> =
-            self.plugins.iter().map(|e| e.plugin.id.as_str()).collect();
+        let installed: HashSet<&str> = self.plugins.iter().map(|e| e.plugin.id.as_str()).collect();
         let all = discovery::fetch(force_refresh)?;
         self.discovery_all = all
             .into_iter()
@@ -177,7 +176,6 @@ impl App {
         self.apply_discovery_filter();
     }
 
-
     pub fn discovery_next(&mut self) {
         if !self.discovery_sources.is_empty() {
             self.discovery_selected = (self.discovery_selected + 1) % self.discovery_sources.len();
@@ -216,10 +214,12 @@ impl App {
 
     pub fn discovery_description(&self) -> Option<String> {
         let source = self.discovery_sources.get(self.discovery_selected)?;
-        source
-            .description
-            .clone()
-            .or_else(|| self.discovery_desc_cache.get(&source.repo).cloned().flatten())
+        source.description.clone().or_else(|| {
+            self.discovery_desc_cache
+                .get(&source.repo)
+                .cloned()
+                .flatten()
+        })
     }
 }
 

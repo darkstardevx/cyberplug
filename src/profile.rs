@@ -55,9 +55,10 @@ pub struct ImportSummary {
 }
 
 pub fn import(path: &Path, currently_installed: &[String]) -> Result<ImportSummary> {
-    let raw = fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
-    let profile: Profile =
-        serde_json::from_str(&raw).with_context(|| format!("failed to parse {}", path.display()))?;
+    let raw =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let profile: Profile = serde_json::from_str(&raw)
+        .with_context(|| format!("failed to parse {}", path.display()))?;
 
     let mut summary = ImportSummary {
         installed: 0,
@@ -75,15 +76,18 @@ pub fn import(path: &Path, currently_installed: &[String]) -> Result<ImportSumma
                 match omarchy::add(repo, false) {
                     Ok(_) => summary.installed += 1,
                     Err(e) => {
-                        summary.errors.push(format!("{}: install failed: {}", entry.id, e));
+                        summary
+                            .errors
+                            .push(format!("{}: install failed: {}", entry.id, e));
                         continue;
                     }
                 }
             } else {
                 // First-party plugin missing on this system — nothing to install, skip.
-                summary
-                    .errors
-                    .push(format!("{}: not present and no repo to install from", entry.id));
+                summary.errors.push(format!(
+                    "{}: not present and no repo to install from",
+                    entry.id
+                ));
                 continue;
             }
         }

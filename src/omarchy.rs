@@ -1,5 +1,5 @@
 use crate::models::Plugin;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::process::Command;
 
 fn run(args: &[&str]) -> Result<String> {

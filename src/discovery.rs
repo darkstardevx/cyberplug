@@ -61,7 +61,7 @@ pub struct Source {
 fn display_name(id: &str) -> String {
     let last_segment = id.rsplit('.').next().unwrap_or(id);
     last_segment
-        .split(|c| c == '-' || c == '_')
+        .split(['-', '_'])
         .map(|word| {
             let mut chars = word.chars();
             match chars.next() {
@@ -143,13 +143,11 @@ fn cache_is_fresh(path: &PathBuf) -> bool {
 pub fn fetch(force_refresh: bool) -> Result<Vec<Source>> {
     let path = cache_path()?;
 
-    if !force_refresh && cache_is_fresh(&path) {
-        if let Ok(raw) = fs::read_to_string(&path) {
-            if let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
+    if !force_refresh && cache_is_fresh(&path)
+        && let Ok(raw) = fs::read_to_string(&path)
+            && let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
                 return Ok(flatten(reg.sources));
             }
-        }
-    }
 
     match reqwest::blocking::get(REGISTRY_URL).and_then(|r| r.text()) {
         Ok(raw) => {
@@ -159,11 +157,10 @@ pub fn fetch(force_refresh: bool) -> Result<Vec<Source>> {
             Ok(flatten(reg.sources))
         }
         Err(_) => {
-            if let Ok(raw) = fs::read_to_string(&path) {
-                if let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
+            if let Ok(raw) = fs::read_to_string(&path)
+                && let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
                     return Ok(flatten(reg.sources));
                 }
-            }
             Ok(vec![])
         }
     }

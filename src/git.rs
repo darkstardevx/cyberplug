@@ -23,9 +23,5 @@ pub fn remote_url(id: &str) -> Option<String> {
         return None;
     }
     let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if url.is_empty() {
-        None
-    } else {
-        Some(url)
-    }
+    if url.is_empty() { None } else { Some(url) }
 }
