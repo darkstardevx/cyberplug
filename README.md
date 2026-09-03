@@ -8,9 +8,11 @@ Omarchy ships a capable `omarchy plugin` CLI. It has no UI. cyberplug is the UI.
 
     git clone https://github.com/darkstardevx/cyberplug.git
     cd cyberplug
-    cargo build --release
+    ./install.sh
 
-Binary lands at `target/release/cyberplug`. Put it on your `$PATH`.
+That builds the release binary and drops it in `~/.local/bin/cyberplug`.
+On Omarchy, `~/.local/bin` is already on your `$PATH` — nothing else to
+do. `install.sh` checks and tells you if it isn't.
 
 ## Use
 
