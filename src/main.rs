@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod discovery;
 mod models;
 mod omarchy;
 mod settings;
@@ -44,6 +45,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut app::App
                 Mode::ConfirmRemove => handle_confirm_remove(app, key.code)?,
                 Mode::Settings => handle_settings(app, key.code)?,
                 Mode::Placement => handle_placement(app, key.code)?,
+                Mode::Discovery => handle_discovery(app, key.code)?,
             }
         }
 
@@ -107,6 +109,12 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
                 Err(e) => format!("error: {}", e),
             });
             app.refresh()?;
+        }
+        KeyCode::Char('D') => {
+            app.mode = Mode::Discovery;
+            app.status = Some("loading registry...".to_string());
+            app.load_discovery(false)?;
+            app.status = Some(format!("{} plugins available", app.discovery_sources.len()));
         }
         _ => {}
     }
@@ -293,6 +301,31 @@ fn handle_placement(app: &mut app::App, code: KeyCode) -> Result<()> {
                 app.refresh()?;
             }
             app.mode = Mode::Normal;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_discovery(app: &mut app::App, code: KeyCode) -> Result<()> {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => app.mode = Mode::Normal,
+        KeyCode::Char('j') | KeyCode::Down => app.discovery_next(),
+        KeyCode::Char('k') | KeyCode::Up => app.discovery_previous(),
+        KeyCode::Char('r') => {
+            app.status = Some("refreshing registry...".to_string());
+            app.load_discovery(true)?;
+            app.status = Some(format!("{} plugins available", app.discovery_sources.len()));
+        }
+        KeyCode::Enter => {
+            if let Some(source) = app.discovery_sources.get(app.discovery_selected).cloned() {
+                app.status = Some(match omarchy::add(&source.repo, false) {
+                    Ok(_) => format!("added {}", source.catalog.name),
+                    Err(e) => format!("error: {}", e),
+                });
+                app.refresh()?;
+                app.load_discovery(false)?;
+            }
         }
         _ => {}
     }
