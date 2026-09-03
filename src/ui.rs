@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs, Wrap},
     Frame,
 };
 
@@ -14,6 +14,7 @@ fn category_color(category: &str) -> Color {
         "System" => Color::Red,
         "Info" => Color::Cyan,
         "Desktop" => Color::Magenta,
+        "Productivity" => Color::Green,
         _ => Color::White,
     }
 }
@@ -30,6 +31,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Mode::Settings => draw_settings(frame, app, chunks[0]),
         Mode::Placement => draw_placement(frame, app, chunks[0]),
         Mode::Discovery => draw_discovery(frame, app, chunks[0]),
+        Mode::Profile => draw_profile_menu(frame, chunks[0]),
+        Mode::ProfilePath => draw_profile_path(frame, app, chunks[0]),
         _ => draw_main(frame, app, chunks[0]),
     }
 
@@ -99,24 +102,13 @@ fn draw_list(frame: &mut Frame, app: &App, area: Rect) {
                 Some(true) => ("core", Color::Cyan),
                 _ => ("community", Color::Magenta),
             };
-            let category = entry
-                .plugin
-                .bar_widget
-                .as_ref()
-                .and_then(|bw| bw.category.clone())
-                .unwrap_or_default();
-            let cat_color = category_color(&category);
 
-            let mut spans = vec![
+            let spans = vec![
                 Span::styled(format!("{} ", dot), Style::default().fg(color)),
                 Span::raw(entry.plugin.name.clone()),
                 Span::raw("  "),
                 Span::styled(format!("[{}]", badge), Style::default().fg(badge_color)),
             ];
-            if !category.is_empty() {
-                spans.push(Span::raw("  "));
-                spans.push(Span::styled(category.clone(), Style::default().fg(cat_color)));
-            }
             ListItem::new(Line::from(spans))
         })
         .collect();
@@ -197,7 +189,7 @@ fn draw_detail(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from(entry.plugin.description.clone()));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "j/k nav   / filter   a add   e enable   d disable   x remove   s settings   D discover   u update   U update-all   q quit",
+            "j/k nav  / filter  a add  e enable  d disable  x remove  s settings  D discover  P profile  u update  U all  q quit",
             Style::default().fg(Color::DarkGray),
         )));
         lines
@@ -378,24 +370,55 @@ fn draw_placement(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_discovery(frame: &mut Frame, app: &App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(3), Constraint::Length(1)])
+        .split(area);
+
+    draw_discovery_tabs(frame, app, chunks[0]);
+
     let panes = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-        .split(area);
+        .split(chunks[1]);
 
+    draw_discovery_list(frame, app, panes[0]);
+    draw_discovery_detail(frame, app, panes[1]);
+    draw_discovery_hint(frame, chunks[2]);
+}
+
+fn draw_discovery_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let mut titles: Vec<Line> = vec![Line::from("All")];
+    titles.extend(
+        app.discovery_categories
+            .iter()
+            .map(|c| Line::from(c.clone())),
+    );
+
+    let tabs = Tabs::new(titles)
+        .block(
+            Block::default()
+                .title(" categories — ←/→ or h/l to switch ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Magenta)),
+        )
+        .select(app.discovery_category_index)
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        )
+        .divider(" ");
+
+    frame.render_widget(tabs, area);
+}
+
+fn draw_discovery_list(frame: &mut Frame, app: &App, area: Rect) {
     let items: Vec<ListItem> = app
         .discovery_sources
         .iter()
-        .map(|s| {
-            let category = s.catalog.category.clone().unwrap_or_default();
-            let color = category_color(&category);
-            let line = Line::from(vec![
-                Span::raw(s.catalog.name.clone()),
-                Span::raw("  "),
-                Span::styled(category, Style::default().fg(color)),
-            ]);
-            ListItem::new(line)
-        })
+        .map(|s| ListItem::new(Line::from(s.name.clone())))
         .collect();
 
     let mut state = ListState::default();
@@ -404,8 +427,9 @@ fn draw_discovery(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let title = format!(
-        " discover — {} available (r refresh, enter install, esc back) ",
-        app.discovery_sources.len()
+        " discover — {} of {} ",
+        app.discovery_sources.len(),
+        app.discovery_all.len()
     );
     let list = List::new(items)
         .block(
@@ -417,40 +441,101 @@ fn draw_discovery(frame: &mut Frame, app: &App, area: Rect) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, panes[0], &mut state);
+    frame.render_stateful_widget(list, area, &mut state);
+}
 
+fn draw_discovery_detail(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .title(" details ")
+        .title(" details — press enter to install ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Magenta));
 
     let text = if let Some(source) = app.discovery_sources.get(app.discovery_selected) {
         let mut lines = vec![
             Line::from(Span::styled(
-                source.catalog.name.clone(),
+                source.name.clone(),
                 Style::default().add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
-            Line::from(format!("id: {}", source.catalog.id)),
+            Line::from(format!("id: {}", source.id)),
         ];
-        if let Some(v) = &source.catalog.version {
+        if let Some(cat) = &source.category {
+            let color = category_color(cat);
+            lines.push(Line::from(vec![
+                Span::raw("category: "),
+                Span::styled(cat.clone(), Style::default().fg(color)),
+            ]));
+        }
+        if let Some(v) = &source.version {
             lines.push(Line::from(format!("version: {}", v)));
         }
-        if let Some(a) = &source.catalog.author {
+        if let Some(a) = &source.author {
             lines.push(Line::from(format!("author: {}", a)));
         }
-        if !source.catalog.tags.is_empty() {
-            lines.push(Line::from(format!("tags: {}", source.catalog.tags.join(", "))));
+        if !source.tags.is_empty() {
+            lines.push(Line::from(format!("tags: {}", source.tags.join(", "))));
         }
         lines.push(Line::from(format!("repo: {}", source.repo)));
         lines.push(Line::from(""));
-        lines.push(Line::from(source.catalog.description.clone()));
+        match app.discovery_description() {
+            Some(desc) => lines.push(Line::from(desc)),
+            None => lines.push(Line::from(Span::styled(
+                "(no description available)",
+                Style::default().fg(Color::DarkGray),
+            ))),
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "▶ press ENTER to install this plugin",
+            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+        )));
         lines
     } else {
-        vec![Line::from("No plugins to discover — try r to refresh.")]
+        vec![Line::from("No plugins in this category.")]
     };
 
-    frame.render_widget(Paragraph::new(text).block(block).wrap(Wrap { trim: true }), panes[1]);
+    frame.render_widget(Paragraph::new(text).block(block).wrap(Wrap { trim: true }), area);
+}
+
+fn draw_discovery_hint(frame: &mut Frame, area: Rect) {
+    let hint = Paragraph::new(
+        "j/k nav  h/l category  ENTER install  r refresh  esc back",
+    )
+    .style(Style::default().fg(Color::DarkGray));
+    frame.render_widget(hint, area);
+}
+
+fn draw_profile_menu(frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .title(" profile ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Green));
+
+    let lines = vec![
+        Line::from(""),
+        Line::from("  e   export current setup to a file"),
+        Line::from("  i   import a setup from a file"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  esc back",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    frame.render_widget(Paragraph::new(lines).block(block), area);
+}
+
+fn draw_profile_path(frame: &mut Frame, app: &App, area: Rect) {
+    let title = if app.profile_exporting {
+        " export to — enter path, enter to confirm, esc to cancel "
+    } else {
+        " import from — enter path, enter to confirm, esc to cancel "
+    };
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Green));
+    frame.render_widget(Paragraph::new(app.input_buffer.as_str()).block(block), area);
 }
 
 fn draw_status_line(frame: &mut Frame, app: &App, area: Rect) {

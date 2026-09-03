@@ -1,8 +1,10 @@
 mod app;
 mod config;
 mod discovery;
+mod git;
 mod models;
 mod omarchy;
+mod profile;
 mod settings;
 mod ui;
 
@@ -15,6 +17,13 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use std::path::PathBuf;
+
+fn default_profile_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".config/cyberplug/profile.json")
+}
 
 fn main() -> Result<()> {
     enable_raw_mode()?;
@@ -46,6 +55,8 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut app::App
                 Mode::Settings => handle_settings(app, key.code)?,
                 Mode::Placement => handle_placement(app, key.code)?,
                 Mode::Discovery => handle_discovery(app, key.code)?,
+                Mode::Profile => handle_profile(app, key.code),
+                Mode::ProfilePath => handle_profile_path(app, key.code)?,
             }
         }
 
@@ -68,7 +79,7 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
         KeyCode::Char('e') => {
             if app.selected_id().is_some() {
                 app.mode = Mode::Placement;
-                app.placement_selected = 1; // default to "center"
+                app.placement_selected = 1;
             }
         }
         KeyCode::Char('d') => {
@@ -115,6 +126,9 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
             app.status = Some("loading registry...".to_string());
             app.load_discovery(false)?;
             app.status = Some(format!("{} plugins available", app.discovery_sources.len()));
+        }
+        KeyCode::Char('P') => {
+            app.mode = Mode::Profile;
         }
         _ => {}
     }
@@ -312,6 +326,15 @@ fn handle_discovery(app: &mut app::App, code: KeyCode) -> Result<()> {
         KeyCode::Esc | KeyCode::Char('q') => app.mode = Mode::Normal,
         KeyCode::Char('j') | KeyCode::Down => app.discovery_next(),
         KeyCode::Char('k') | KeyCode::Up => app.discovery_previous(),
+        KeyCode::Char('h') | KeyCode::Left => {
+            let total = app.discovery_categories.len() + 1;
+            app.discovery_category_index =
+                (app.discovery_category_index + total - 1) % total;
+            app.apply_discovery_filter();
+        }
+        KeyCode::Char('l') | KeyCode::Right => {
+            app.discovery_cycle_category();
+        }
         KeyCode::Char('r') => {
             app.status = Some("refreshing registry...".to_string());
             app.load_discovery(true)?;
@@ -319,14 +342,104 @@ fn handle_discovery(app: &mut app::App, code: KeyCode) -> Result<()> {
         }
         KeyCode::Enter => {
             if let Some(source) = app.discovery_sources.get(app.discovery_selected).cloned() {
-                app.status = Some(match omarchy::add(&source.repo, false) {
-                    Ok(_) => format!("added {}", source.catalog.name),
-                    Err(e) => format!("error: {}", e),
-                });
-                app.refresh()?;
-                app.load_discovery(false)?;
+                app.status = Some(format!("installing {}...", source.name));
+                match omarchy::add(&source.repo, false) {
+                    Ok(_) => {
+                        app.refresh()?;
+                        // Only route into placement if the plugin actually
+                        // registered as a bar widget under this id — a repo
+                        // can install without exposing that exact id (e.g.
+                        // suite repos where the id we showed doesn't map
+                        // 1:1 to what got installed).
+                        if app.plugins.iter().any(|e| e.plugin.id == source.id) {
+                            app.selected = app
+                                .filtered
+                                .iter()
+                                .position(|&i| app.plugins[i].plugin.id == source.id)
+                                .unwrap_or(0);
+                            app.mode = Mode::Placement;
+                            app.placement_selected = 1;
+                            app.status = Some(format!(
+                                "{} installed — choose bar placement",
+                                source.name
+                            ));
+                        } else {
+                            app.status = Some(format!(
+                                "{} installed but not found as '{}' — check `omarchy plugin list` and enable manually",
+                                source.name, source.id
+                            ));
+                        }
+                        app.load_discovery(false)?;
+                    }
+                    Err(e) => {
+                        app.status = Some(format!("error: {}", e));
+                    }
+                }
             }
         }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_profile(app: &mut app::App, code: KeyCode) {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => app.mode = Mode::Normal,
+        KeyCode::Char('e') => {
+            app.profile_exporting = true;
+            app.input_buffer = default_profile_path().to_string_lossy().to_string();
+            app.mode = Mode::ProfilePath;
+        }
+        KeyCode::Char('i') => {
+            app.profile_exporting = false;
+            app.input_buffer = default_profile_path().to_string_lossy().to_string();
+            app.mode = Mode::ProfilePath;
+        }
+        _ => {}
+    }
+}
+
+fn handle_profile_path(app: &mut app::App, code: KeyCode) -> Result<()> {
+    match code {
+        KeyCode::Esc => {
+            app.input_buffer.clear();
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Enter => {
+            let path = PathBuf::from(app.input_buffer.trim());
+            if app.profile_exporting {
+                if let Some(parent) = path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                app.status = Some(match profile::export(&app.plugins, &app.local_settings, &path) {
+                    Ok(_) => format!("exported profile to {}", path.display()),
+                    Err(e) => format!("error: {}", e),
+                });
+            } else {
+                let installed: Vec<String> =
+                    app.plugins.iter().map(|e| e.plugin.id.clone()).collect();
+                match profile::import(&path, &installed) {
+                    Ok(summary) => {
+                        app.status = Some(format!(
+                            "imported: {} installed, {} enabled, {} disabled, {} settings ({} errors)",
+                            summary.installed,
+                            summary.enabled,
+                            summary.disabled,
+                            summary.settings_applied,
+                            summary.errors.len()
+                        ));
+                        app.refresh()?;
+                    }
+                    Err(e) => app.status = Some(format!("error: {}", e)),
+                }
+            }
+            app.input_buffer.clear();
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Backspace => {
+            app.input_buffer.pop();
+        }
+        KeyCode::Char(c) => app.input_buffer.push(c),
         _ => {}
     }
     Ok(())
