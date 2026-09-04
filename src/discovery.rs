@@ -143,11 +143,13 @@ fn cache_is_fresh(path: &PathBuf) -> bool {
 pub fn fetch(force_refresh: bool) -> Result<Vec<Source>> {
     let path = cache_path()?;
 
-    if !force_refresh && cache_is_fresh(&path)
+    if !force_refresh
+        && cache_is_fresh(&path)
         && let Ok(raw) = fs::read_to_string(&path)
-            && let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
-                return Ok(flatten(reg.sources));
-            }
+        && let Ok(reg) = serde_json::from_str::<Registry>(&raw)
+    {
+        return Ok(flatten(reg.sources));
+    }
 
     match reqwest::blocking::get(REGISTRY_URL).and_then(|r| r.text()) {
         Ok(raw) => {
@@ -158,9 +160,10 @@ pub fn fetch(force_refresh: bool) -> Result<Vec<Source>> {
         }
         Err(_) => {
             if let Ok(raw) = fs::read_to_string(&path)
-                && let Ok(reg) = serde_json::from_str::<Registry>(&raw) {
-                    return Ok(flatten(reg.sources));
-                }
+                && let Ok(reg) = serde_json::from_str::<Registry>(&raw)
+            {
+                return Ok(flatten(reg.sources));
+            }
             Ok(vec![])
         }
     }
