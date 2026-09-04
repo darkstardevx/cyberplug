@@ -237,7 +237,6 @@ fn handle_settings(app: &mut app::App, code: KeyCode) -> Result<()> {
                                 }
                             value = (n as i64).to_string();
                         }
-
                     app.local_settings.set(&plugin_id, &key, value.clone());
                     app.local_settings.save()?;
                     app.status = Some(format!("staged {}={} for {}", key, value, plugin_id));
