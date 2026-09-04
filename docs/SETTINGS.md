@@ -24,10 +24,3 @@ Wiring this through for real needs one thing: a confirmed example of how
 `shell.json` represents a configured plugin instance. Once that shape is
 known, `settings.rs` writes to the real location instead of the staging
 file, and edits take effect on save.
-
-## Why not just try it and see
-
-Because tonight already included two separate boot failures from
-config-format assumptions that turned out wrong in ways that weren't
-obvious until reboot. A wrong guess in `shell.json` is the same category
-of mistake, just faster to make. Confirm the shape first.
