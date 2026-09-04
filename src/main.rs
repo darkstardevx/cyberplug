@@ -102,11 +102,12 @@ fn handle_normal(app: &mut app::App, code: KeyCode) -> Result<()> {
         }
         KeyCode::Char('s') => {
             if let Some(entry) = app.selected_entry()
-                && !entry.plugin.schema().is_empty() {
-                    app.mode = Mode::Settings;
-                    app.settings_selected = 0;
-                    app.settings_editing = false;
-                }
+                && !entry.plugin.schema().is_empty()
+            {
+                app.mode = Mode::Settings;
+                app.settings_selected = 0;
+                app.settings_editing = false;
+            }
         }
         KeyCode::Char('u') => {
             if let Some(id) = app.selected_id() {
@@ -223,21 +224,22 @@ fn handle_settings(app: &mut app::App, code: KeyCode) -> Result<()> {
                     let mut value = app.settings_edit_buffer.trim().to_string();
 
                     if field.field_type == "integer"
-                        && let Ok(mut n) = value.parse::<f64>() {
-                            if let Some(min) = field.min {
-                                n = n.max(min);
-                            }
-                            if let Some(max) = field.max {
-                                n = n.min(max);
-                            }
-                            if let Some(step) = field.step
-                                && step > 0.0 {
-                                    let base = field.min.unwrap_or(0.0);
-                                    n = base + ((n - base) / step).round() * step;
-                                }
-                            value = (n as i64).to_string();
+                        && let Ok(mut n) = value.parse::<f64>()
+                    {
+                        if let Some(min) = field.min {
+                            n = n.max(min);
                         }
-
+                        if let Some(max) = field.max {
+                            n = n.min(max);
+                        }
+                        if let Some(step) = field.step
+                            && step > 0.0
+                        {
+                            let base = field.min.unwrap_or(0.0);
+                            n = base + ((n - base) / step).round() * step;
+                        }
+                        value = (n as i64).to_string();
+                    }
                     app.local_settings.set(&plugin_id, &key, value.clone());
                     app.local_settings.save()?;
                     app.status = Some(format!("staged {}={} for {}", key, value, plugin_id));
